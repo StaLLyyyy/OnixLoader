@@ -1,0 +1,189 @@
+local loader_state = "fading_in" 
+local loaded_script_code = nil
+local last_click_time = 0
+local script_has_been_executed = false
+local start_time = globals.curtime()
+local animation_duration = 0.5 
+
+local window_size = Vector2(380, 250)
+local window_pos
+
+local button_size = Vector2(220, 35)
+
+local colors = {
+    background = { r = 13, g = 13, b = 13 },
+    frame_light = { r = 52, g = 52, b = 52 },
+    frame_dark = { r = 28, g = 28, b = 28 },
+    button_bg = { r = 45, g = 45, b = 45 },
+    button_hover = { r = 60, g = 60, b = 60 },
+    button_outline = { r = 80, g = 80, b = 80 },
+    text_light = { r = 220, g = 220, b = 220 }
+}
+
+local is_dragging = false
+local drag_offset = Vector2(0, 0)
+
+local function hsv_to_rgb(h, s, v)
+    local r, g, b
+    local i = math.floor(h * 6)
+    local f = h * 6 - i
+    local p = v * (1 - s)
+    local q = v * (1 - f * s)
+    local t = v * (1 - (1 - f) * s)
+    i = i % 6
+    if i == 0 then r, g, b = v, t, p
+    elseif i == 1 then r, g, b = q, v, p
+    elseif i == 2 then r, g, b = p, v, t
+    elseif i == 3 then r, g, b = p, q, v
+    elseif i == 4 then r, g, b = t, p, v
+    else r, g, b = v, p, q end
+    return math.floor(r * 255), math.floor(g * 255), math.floor(b * 255)
+end
+
+local function ease_out_cubic(t)
+    return 1 - math.pow(1 - t, 3)
+end
+
+local function draw_multi_layer_button(x, y, w, h, text, is_hovering, alpha)
+    local base_color = is_hovering and colors.button_hover or colors.button_bg
+    
+    render.rect(x, y, w, h, colors.frame_light.r, colors.frame_light.g, colors.frame_light.b, alpha, 0)
+    render.rect(x + 1, y + 1, w - 2, h - 2, colors.frame_dark.r, colors.frame_dark.g, colors.frame_dark.b, alpha, 0)
+    render.rect(x + 2, y + 2, w - 4, h - 4, base_color.r, base_color.g, base_color.b, alpha, 0)
+    
+    local text_size = render.measure_text(text, 3)
+    render.text(x + (w - text_size.x) / 2, y + (h - text_size.y) / 2, text, colors.text_light.r, colors.text_light.g, colors.text_light.b, alpha, "s", 3)
+end
+
+cheat.set_callback("paint", function()
+    if script_has_been_executed then
+        cheat.set_callback("paint", function() end)
+        return
+    end
+
+    if loader_state == "executing" then
+        script_has_been_executed = true
+        local func, err = loadstring(loaded_script_code)
+        if func then
+            local success, exec_err = pcall(func)
+            if not success then print("Error executing script: " .. tostring(exec_err)) end
+        else
+            print("Error compiling script: " .. tostring(err))
+        end
+        return
+    end
+
+    local screen_size = render.screen_size()
+    if not screen_size or not screen_size.x or not screen_size.y then return end
+
+    if not window_pos then
+        window_pos = Vector2((screen_size.x - window_size.x) / 2, (screen_size.y - window_size.y) / 2)
+    end
+    
+    if not window_pos or not window_pos.x or not window_pos.y then return end
+
+    local mouse_pos = input.cursor_position()
+    if utils.key_state(0x01) then
+        if not is_dragging and (mouse_pos.x > window_pos.x and mouse_pos.x < window_pos.x + window_size.x and mouse_pos.y > window_pos.y and mouse_pos.y < window_pos.y + 40) then
+            is_dragging = true
+            drag_offset.x = mouse_pos.x - window_pos.x
+            drag_offset.y = mouse_pos.y - window_pos.y
+        end
+    else
+        is_dragging = false
+    end
+
+    if is_dragging then
+        window_pos.x = mouse_pos.x - drag_offset.x
+        window_pos.y = mouse_pos.y - drag_offset.y
+    end
+
+    local time_since_start = globals.curtime() - start_time
+    local anim_progress = 1.0
+    
+    if loader_state == "fading_in" then
+        anim_progress = ease_out_cubic(math.min(time_since_start / animation_duration, 1.0))
+        if anim_progress >= 1.0 then
+            loader_state = "idle"
+        end
+    elseif loader_state == "fading_out" then
+        anim_progress = 1.0 - ease_out_cubic(math.min(time_since_start / 0.4, 1.0))
+        if anim_progress <= 0.0 then
+            loader_state = "executing"
+        end
+    elseif loader_state == "exit_fade_out" then
+        anim_progress = 1.0 - ease_out_cubic(math.min(time_since_start / 0.4, 1.0))
+        if anim_progress <= 0.0 then
+            script_has_been_executed = true
+        end
+    end
+    
+    local current_alpha = 255 * anim_progress
+    local x, y = window_pos.x, window_pos.y
+    local width, height = window_size.x, window_size.y
+
+    render.rect(x, y, width, height, colors.background.r, colors.background.g, colors.background.b, current_alpha, 0) 
+    local innerX, innerY, innerWidth, innerHeight = x + 1, y + 1, width - 2, height - 2
+    render.rect(innerX, innerY, innerWidth, innerHeight, colors.frame_light.r, colors.frame_light.g, colors.frame_light.b, current_alpha, 0) 
+    local inner2X, inner2Y, inner2Width, inner2Height = innerX + 1, innerY + 1, innerWidth - 2, innerHeight - 2
+    render.rect(inner2X, inner2Y, inner2Width, inner2Height, colors.frame_dark.r, colors.frame_dark.g, colors.frame_dark.b, current_alpha, 0) 
+    local inner3X, inner3Y, inner3Width, inner3Height = inner2X + 3, inner2Y + 3, inner2Width - 6, inner2Height - 6
+    render.rect(inner3X, inner3Y, inner3Width, inner3Height, colors.frame_light.r, colors.frame_light.g, colors.frame_light.b, current_alpha, 0)
+    local inner4X, inner4Y, inner4Width, inner4Height = inner3X + 1, inner3Y + 1, inner3Width - 2, inner3Height - 2
+    render.rect(inner4X, inner4Y, inner4Width, inner4Height, colors.background.r, colors.background.g, colors.background.b, current_alpha, 0)
+
+    local time = globals.curtime()
+    local line_width = inner4Width
+    for i = 0, line_width do
+        local hue = ((time * 0.05) + (i / line_width) * 0.2) % 1
+        local r, g, b = hsv_to_rgb(hue, 0.8, 1)
+        render.rect(inner4X + i, inner4Y, 1, 2, r, g, b, current_alpha)
+    end
+
+    local title_text = "ONIX.CC"
+    local title_size = render.measure_text(title_text, 4)
+    render.text(x + (width - title_size.x) / 2, y + 50, title_text, colors.text_light.r, colors.text_light.g, colors.text_light.b, current_alpha, "s", 4)
+
+    if loader_state == "loading" then
+        local loading_text = "Loading..."
+        local text_size = render.measure_text(loading_text, 3)
+        render.text(x + (width - text_size.x) / 2, y + (height - text_size.y) / 2, loading_text, colors.text_light.r, colors.text_light.g, colors.text_light.b, current_alpha, "s", 3)
+    elseif loader_state == "idle" or loader_state == "fading_in" then
+        local login_button_pos = Vector2(x + (width - button_size.x) / 2, y + 100)
+        local is_hovering_login = mouse_pos.x > login_button_pos.x and mouse_pos.x < login_button_pos.x + button_size.x and
+                                  mouse_pos.y > login_button_pos.y and mouse_pos.y < login_button_pos.y + button_size.y
+        
+        draw_multi_layer_button(login_button_pos.x, login_button_pos.y, button_size.x, button_size.y, "Login", is_hovering_login, current_alpha)
+
+        local exit_button_pos = Vector2(x + (width - button_size.x) / 2, y + 150)
+        local is_hovering_exit = mouse_pos.x > exit_button_pos.x and mouse_pos.x < exit_button_pos.x + button_size.x and
+                                 mouse_pos.y > exit_button_pos.y and mouse_pos.y < exit_button_pos.y + button_size.y
+
+        draw_multi_layer_button(exit_button_pos.x, exit_button_pos.y, button_size.x, button_size.y, "Exit", is_hovering_exit, current_alpha)
+
+        if utils.key_state(0x01) and globals.curtime() > last_click_time + 0.5 then
+            if is_hovering_login then
+                last_click_time = globals.curtime()
+                loader_state = "loading"
+                
+                local script_url = "https://raw.githubusercontent.com/StaLLyyyy/OnixLoader/main/OnixTridentSurvival"
+                print("Loader started. Attempting to load script...")
+
+                http.get(script_url, function(response_body)
+                    if response_body and #response_body > 50 then
+                        print("Script compiled successfully. Ready to execute.")
+                        loaded_script_code = response_body
+                        start_time = globals.curtime()
+                        loader_state = "fading_out"
+                    else
+                        print("Failed to load script. Server returned an empty or invalid response.")
+                        loader_state = "idle"
+                    end
+                end)
+            elseif is_hovering_exit then
+                start_time = globals.curtime()
+                loader_state = "exit_fade_out"
+            end
+        end
+    end
+end)
