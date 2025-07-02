@@ -1,4 +1,4 @@
-local loader_state = "fading_in" Add commentMore actions
+local loader_state = "fading_in"
 local loaded_script_code = nil
 local last_click_time = 0
 local script_has_been_executed = false
