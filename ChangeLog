@@ -1,4 +1,22 @@
-v1.3
-_____________________
+Changelog v1.4
+______________________
 
-- Updated Loader
+This update focuses on expanding visual customization options and fixing key bugs for a more stable and personalized experience.
+
+Added
+Gradient Text Style: A new "Gradient" option has been added to the "Text Style" dropdown. You can now select two colors for a smooth gradient effect on all ESP text (Name, Distance, HP).
+
+Box Fill: You can now fill the inside of ESP boxes.
+
+Added an "Enable Box Fill" checkbox.
+
+A new "Fill Style" dropdown allows you to choose between "Default" (solid color) and "Gradient".
+
+This feature works for both "Full" and "Corner" box types.
+
+Added corresponding color pickers for the fill and gradient options.
+
+Changed
+Independent Head Circle Color: The Head Circle color is no longer tied to the box color. It now correctly uses its own color picker but will still change to the "In FOV" or "Target" color when applicable.
+
+Independent ESP Element Coloring: The logic for coloring ESP elements (Box, Skeleton, Text, Head Circle) has been separated. Changing the color of one element will no longer affect the others, unless a target is in FOV or locked.
